@@ -7,9 +7,6 @@
 /* Enable thread safety */
 #define ENABLE_THREADS /**/
 
-/* Use Q15 fixed-point computation */
-/* #undef FIXED16 */
-
 /* Use fixed-point computation */
 /* #undef FIXED_POINT */
 
@@ -52,9 +49,6 @@
 /* Define to 1 if you have the <pthread.h> header file. */
 #define HAVE_PTHREAD_H 1
 
-/* Define to 1 if you have the <sndfile.h> header file. */
-#define HAVE_SNDFILE_H 1
-
 /* Define to 1 if you have the `snprintf' function. */
 #define HAVE_SNPRINTF 1
 
@@ -94,9 +88,6 @@
 
 /* The size of `long long', as computed by sizeof. */
 #define SIZEOF_LONG_LONG 8
-
-/* Enable debugging output */
-/* #undef SPHINX_DEBUG */
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1

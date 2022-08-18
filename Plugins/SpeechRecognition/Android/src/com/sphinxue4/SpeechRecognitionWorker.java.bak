@@ -1,0 +1,332 @@
+package com.sphinxue4;
+
+import static android.widget.Toast.makeText;
+import  edu.cmu.pocketsphinx.SpeechRecognizerSetup.defaultSetup;
+import  edu.cmu.pocketsphinx.Decoder.defaultConfig;
+import  edu.cmu.pocketsphinx.Decoder.fileConfig;
+
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+
+import java.lang.Float;
+import java.lang.Iterable;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.ArrayList;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipEntry;
+import java.util.concurrent.TimeUnit;
+import java.util.TreeMap;
+
+import android.content.Context;
+import android.os.AsyncTask;
+import android.app.NativeActivity;
+import android.os.Bundle;
+import android.util.Log;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.android.vending.expansion.zipfile.ZipResourceFile;
+import com.android.vending.expansion.zipfile.ZipResourceFile.ZipEntryRO;
+import com.android.vending.expansion.zipfile.APKExpansionSupport;
+
+import edu.cmu.pocketsphinx.*;
+
+import com.epicgames.ue4.GameActivity;
+
+public class SpeechRecognitionWorker implements Runnable, RecognitionListener {
+	
+	private class DetectedPhrase implements Comparable {
+		public String phrase;
+		public float startTime;
+		public float endTime;
+		public int avgVolume;
+		
+		DetectedPhrase(String phrase, float startTime, float endTime, int avgVolume) {
+			this.phrase = phrase;
+			this.startTime = startTime;
+			this.endTime = endTime;
+			this.avgVolume = avgVolume;
+		}		
+		
+		@Override
+		public int compareTo(Object comparePhrase) {			
+			float otherStartTime=((DetectedPhrase)comparePhrase).startTime;
+			if(this.startTime-otherStartTime > 0)
+			{
+				return 1;
+			}else if(this.startTime-otherStartTime < 0)
+			{
+				return -1;
+			}
+			return 0;			
+		}
+
+	}
+
+	// Pocketsphinx speech recognizer
+	private Config config;
+    private SpeechRecognizer recognizer;
+	
+	private File assetsDir;
+	
+	// Various search modes
+	private static final String GRAM_SEARCH = "grammar_search";
+	private static final String LM_SEARCH = "language_model_search";
+    private static final String KWS_SEARCH = "keyword_search";
+	
+	private boolean initialised = false;
+	
+	private ArrayList<String> hypothesisList;
+	
+	private String language = "";
+	
+	// C++ code
+	
+	// Log debug txt
+	private static native void logText(String phrase);
+	
+	//Callback methods
+	private static native void speechRecognitionActive();
+	private static native void startedSpeaking();
+	private static native void stoppedSpeaking();
+	private static native void phraseSpoken(String[] phrase, float[] start, float[] end);
+		
+	// Set a float sphinx param
+	void SetSphinxParamFloat(String key, float val) {
+		GameActivity.Log.debug("SetSphinxParamFloat(" + key + "," + Float.toString(val));
+		if(recognizer != null)
+		{			
+			recognizer.SetSphinxParamFloat(key, val);
+		}
+	}
+	
+	// Set a boolean sphinx param
+	void SetSphinxParamBoolean(String key, boolean val) {
+		GameActivity.Log.debug("SetSphinxParamBoolean(" + key + "," + Boolean.toString(val));
+		if(recognizer != null)
+		{			
+			recognizer.SetSphinxParamBoolean(key, val);
+		}
+	}
+	
+	// Set a string sphinx param	
+	void SetSphinxParamString(String key, String val) {
+		GameActivity.Log.debug("SetSphinxParamString(" + key + "," + val);
+		if(recognizer != null)
+		{			
+			recognizer.SetSphinxParamString(key, val);
+		}
+	}
+	
+	// Set an integer sphinx param
+	void SetSphinxParamInt(String key, int val) {
+		GameActivity.Log.debug("SetSphinxParamInt(" + key + "," + Integer.toString(val));
+		if(recognizer != null)
+		{			
+			recognizer.SetSphinxParamInt(key, val);
+		}
+	}	
+	
+
+	// TODO: Set a language
+	public void setLanguage(String lang) {
+		GameActivity.Log.debug("setLanguage(" + lang + ")");
+	}
+	
+    // starts the service
+    public void init() throws Exception {		
+		GameActivity.Log.debug("Init()");
+		hypothesisList = new ArrayList<String>();				
+		setupRecognizer("en");
+    }
+	
+	public boolean LogTxt(String txt)
+	{
+		GameActivity.Log.debug("LogTxt(" + txt + ")");
+		return true;
+	}
+
+	
+	public String getHypothesis() {
+		return null;
+	}
+	
+	
+	// Do nothing...may change
+    @Override
+    public void onPartialResult(Hypothesis hypothesis) {
+	}
+	
+	@Override
+	public void onBeginningOfSpeech() {
+		startedSpeaking();
+	}
+	
+	@Override
+	public void onEndOfSpeech() {
+		stoppedSpeaking();
+	}
+	
+    /**
+     * This callback is called when we stop the recognizer.
+     */
+    @Override
+    public void onResult(Hypothesis hypothesis, ArrayList<String> words, ArrayList<Integer> startFrames, ArrayList<Integer> endFrames) {
+        if (hypothesis != null) {			
+			String text = hypothesis.getHypstr();			
+			ArrayList<DetectedPhrase> orderedPhrases = new ArrayList<DetectedPhrase>();
+			Decoder d = recognizer.getDecoder();
+			Config c = d.getConfig();
+			int frameRate = c.getInt("-frate");
+			int i = 0;			
+			GameActivity.Log.debug("OnResult() Loop");
+			if(words != null) {
+				for(String word : words) {
+					Integer sf = startFrames.get(i);
+					Integer ef = endFrames.get(i);
+					float startTime = ((float)sf / frameRate);
+					float endTime = ((float)ef / frameRate);	
+					GameActivity.Log.debug("Sphinx Segment: Result: Word" + word);
+					GameActivity.Log.debug("Sphinx Segment: Result: Start" + startTime);
+					GameActivity.Log.debug("Sphinx Segment: Result: End" + endTime);
+					DetectedPhrase phrase = new DetectedPhrase(word, startTime, endTime, 0);
+					orderedPhrases.add(phrase);
+					i++;					
+				}
+			}			
+			Collections.sort(orderedPhrases);
+			i = 0;
+			int length = orderedPhrases.size();
+			String[] orderedPhraseStrings = new String[length];
+			float[] startTimes = new float[length];
+			float[] endTimes = new float[length];
+			
+			for (DetectedPhrase entry : orderedPhrases) {
+				GameActivity.Log.debug("phrase: " + i + " : " + entry.phrase);
+				orderedPhraseStrings[i] = entry.phrase;
+				startTimes[i] = entry.startTime;
+				endTimes[i] = entry.endTime;
+				i++;						
+			}
+			GameActivity.Log.debug("before phrase spoken");
+			phraseSpoken(orderedPhraseStrings, startTimes, endTimes);
+			GameActivity.Log.debug("after phrase spoken");
+					
+		}
+    }
+
+    private void switchSearch(String searchName) {
+        recognizer.stop();	
+        recognizer.startListening(searchName);
+		speechRecognitionActive();
+		GameActivity.Log.debug("switchSearch(): " + searchName);		
+    }
+	
+	private void setupRecognizer(String language) throws IOException 
+	{		
+		GameActivity.Log.debug("setupRecognizer() " + language);
+		this.language = language;
+		File filePath = GameActivity.Get().getApplicationContext().getFilesDir();	
+		//File filePath = new File("/sdcard/UE4Game/");
+		
+		String projectName = GameActivity.Get().getPackageName();		
+		projectName = projectName.substring(projectName.lastIndexOf('.') + 1);
+		GameActivity.Log.debug("projectName = " + projectName);		
+		if(filePath != null)
+		{
+			GameActivity.Log.debug("Path not null");
+			if(filePath.exists()){
+				GameActivity.Log.debug("Path exists");
+			}
+			if(filePath.isDirectory()){
+				GameActivity.Log.debug(filePath.getAbsolutePath());				
+			}
+			assetsDir = new File(filePath.getAbsolutePath() + "/" + projectName + "/Content/SpeechRecognition/model");
+			if(assetsDir.isDirectory()){
+				GameActivity.Log.debug(assetsDir.getAbsolutePath());		
+			}
+		}
+			
+		
+		File dictionaryFile = new File(assetsDir, language + "/" + language + ".dict");
+		if(dictionaryFile != null) {
+			GameActivity.Log.debug("dictionaryFile exists ");
+		}
+		
+		// init with default configuration
+        recognizer = defaultSetup()
+                .setAcousticModel(new File(assetsDir, language + "/" + language))
+                .setDictionary(new File(assetsDir, language + "/" + language + ".dict"))                
+                .getRecognizer();
+				
+		double VE_5 = 1 * (10)^-30;
+		GameActivity.Log.debug("created recogniser");
+    }
+	
+	// Methods to set the different various search modes (eg. Grammar, Language Model or Keyword)
+	public void setGrammarMode(String grammarName) {
+		GameActivity.Log.debug("setGrammarMode()");
+		File gramFile = new File(assetsDir, language + "/grammars/" + grammarName + ".gram");
+		recognizer.addGrammarSearch(GRAM_SEARCH, gramFile);
+		switchSearch(GRAM_SEARCH);
+	}
+	
+	// Sets speech recognition to Keyword recognition mode
+	public void setKeywordPhrases(String[] phrases,String[] tollerence, Integer keyCount) {
+		GameActivity.Log.debug("setKeywordPhrases()");
+		for(String str:phrases) {
+			GameActivity.Log.debug("String: " + str);
+		}
+		for(String tol:tollerence) {
+			GameActivity.Log.debug("Tollerence: " + tol);
+		}
+		recognizer.addKeyphraseSearch(KWS_SEARCH, phrases, tollerence, keyCount);
+		switchSearch(KWS_SEARCH);
+	}
+	
+	public void setLanguageModel(String languageModel) {
+		GameActivity.Log.debug("setLanguageModel()");
+		File langModelFile = new File(assetsDir, language + "/language_models/" + languageModel + ".lm");
+		recognizer.addNgramSearch(GRAM_SEARCH, langModelFile);
+		switchSearch(GRAM_SEARCH);
+	}
+	
+	@Override
+    public void onError(Exception error) {
+		GameActivity.Log.debug("onError(): " + error.getMessage());
+    }
+
+    @Override
+    public void onTimeout() {
+        switchSearch(KWS_SEARCH);
+    }
+	
+    @Override
+    public void run() {
+		// enable and start keyword listener
+		GameActivity.Log.debug("SpeechRecognitionWorker Starting");
+		if(recognizer != null) {
+			GameActivity.Log.debug("recognizer exists");
+		}else{
+			GameActivity.Log.debug("recognizer does not exist");
+		}
+		recognizer.addListener(this);
+		GameActivity.Log.debug("SpeechRecognitionWorker STARTED");
+    }
+	
+	// stops the listener
+    public void stopListening() {
+		recognizer.cancel();
+        recognizer.shutdown();
+    }
+
+}

@@ -3,6 +3,7 @@ using System.IO;
 
 namespace UnrealBuildTool.Rules
 {
+
 	public class SpeechRecognition : ModuleRules
 	{
 
@@ -16,18 +17,26 @@ namespace UnrealBuildTool.Rules
             get { return Path.GetFullPath(Path.Combine(ModulePath, "../../ThirdParty/")); }
         }
 
-		public SpeechRecognition(TargetInfo Target)
+		public SpeechRecognition(ReadOnlyTargetRules Target) : base(Target)
 		{
-			PublicIncludePaths.AddRange(
+
+
+            PublicIncludePathModuleNames.Add("Launch");
+            /*
+            PublicIncludePaths.AddRange(
 				new string[] {
                     "SpeechRecognition/Public",
+					"Runtime/Launch/Public"
 					// ... add public include paths required here ...
 				}
 				);
+            */
 
-			PrivateIncludePaths.AddRange(
+            PrivateIncludePaths.AddRange(
 				new string[] {
 					"SpeechRecognition/Private",
+					"Runtime/Launch/Private",
+                    "Source/Runtime/Launch/Private"
 					// ... add other private include paths required here ...
 				}
 				);
@@ -38,6 +47,8 @@ namespace UnrealBuildTool.Rules
 				    "Core", 
 				    "CoreUObject", 
 				    "Engine", 
+					"Slate",
+					"SlateCore",
 				    "InputCore",
 				    "RHI"
 					// ... add other public dependencies that you statically link with here ...
@@ -58,12 +69,46 @@ namespace UnrealBuildTool.Rules
 				}
 				);
 
+            LoadSoundFile(Target);
             LoadSphinxBase(Target);
             LoadPocketSphinx(Target);
-		}
 
-        
-        public bool LoadSphinxBase(TargetInfo Target)
+            // Load Boost
+            PublicIncludePaths.Add(Path.Combine(ThirdPartyPath, "Boost"));
+            PrivateIncludePaths.Add(Path.Combine(ThirdPartyPath, "Boost"));
+
+           // Log.TraceInformation("your log text");
+
+            string PluginPath = Utils.MakePathRelativeTo(ModuleDirectory, Target.RelativeEnginePath);
+            AdditionalPropertiesForReceipt.Add(new ReceiptProperty("AndroidPlugin", Path.Combine(PluginPath, "SpeechRecognition_APL.xml")));
+        }
+
+        public bool LoadSoundFile(ReadOnlyTargetRules Target)
+        {
+            bool isLibrarySupported = false;
+
+            if ((Target.Platform == UnrealTargetPlatform.Win64) || (Target.Platform == UnrealTargetPlatform.Win32))
+            {
+                isLibrarySupported = true;
+                string PlatformString = (Target.Platform == UnrealTargetPlatform.Win64) ? "x64" : "x86";
+                string LibrariesPath = System.IO.Path.Combine(ThirdPartyPath, "SoundFile", "Libraries");
+                LibrariesPath = System.IO.Path.Combine(LibrariesPath, PlatformString);
+                PublicAdditionalLibraries.Add(System.IO.Path.Combine(LibrariesPath, "SoundFile.lib"));
+            }
+
+            if (isLibrarySupported)
+            {
+                // Include path
+                PublicIncludePaths.Add(System.IO.Path.Combine(ThirdPartyPath, "SoundFile", "Includes"));
+                PrivateIncludePaths.Add(System.IO.Path.Combine(ThirdPartyPath, "SoundFile", "Includes"));
+            }
+
+            //PublicDefinitions.Add(string.Format("WITH_SOUND_FILE_BINDING={0}", isLibrarySupported ? 1 : 0));
+
+            return isLibrarySupported;
+        }
+
+        public bool LoadSphinxBase(ReadOnlyTargetRules Target)
         {
             bool isLibrarySupported = false;
 
@@ -79,7 +124,7 @@ namespace UnrealBuildTool.Rules
 
                 // TODO: Copy dlls to alternative package directory, to be loaded through a manual process
                 PublicDelayLoadDLLs.Add("SphinxBase.dll");
-                RuntimeDependencies.Add(new RuntimeDependency(Path.Combine(Path.Combine(LibrariesPath, "SphinxBase.dll"))));         
+                RuntimeDependencies.Add(Path.Combine(Path.Combine(LibrariesPath, "SphinxBase.dll")));         
             }
 
             if (Target.Platform == UnrealTargetPlatform.Mac)
@@ -90,9 +135,21 @@ namespace UnrealBuildTool.Rules
 
                 LibraryPath = Path.Combine(LibraryPath, "osx");
 
-PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libopenal.dylib"));
-PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxad.a"));
-PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxbase.a"));
+				PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libopenal.dylib"));
+				PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxad.a"));
+				PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxbase.a"));
+            }
+			
+			if (Target.Platform == UnrealTargetPlatform.Android)
+            {
+                isLibrarySupported = true;
+                string LibraryPath = Path.Combine(ThirdPartyPath, "Android", "ARMv7");
+
+                //PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxbase_wrap.a"));
+                //PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxutil.a"));
+                //PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxfe.a"));
+                //PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxfeat.a"));
+                //PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxlm.a"));
             }
 
             if (isLibrarySupported)
@@ -102,12 +159,12 @@ PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxbase.a"));
                 PrivateIncludePaths.Add(Path.Combine(ThirdPartyPath, "SphinxBase", "Includes"));
             }
 
-            Definitions.Add(string.Format("WITH_SPHINX_BASE_BINDING={0}", isLibrarySupported ? 1 : 0));
+            //PublicDefinitions.Add(string.Format("WITH_SPHINX_BASE_BINDING={0}", isLibrarySupported ? 1 : 0));
 
             return isLibrarySupported;
         }
 
-        public bool LoadPocketSphinx(TargetInfo Target)
+        public bool LoadPocketSphinx(ReadOnlyTargetRules Target)
         {
             bool isLibrarySupported = false;
 
@@ -123,7 +180,7 @@ PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxbase.a"));
 
                 // TODO: Copy dlls to alternative package directory, to be loaded through a manual process
                 PublicDelayLoadDLLs.Add("PocketSphinx.dll");
-                RuntimeDependencies.Add(new RuntimeDependency(Path.Combine(Path.Combine(LibrariesPath, "PocketSphinx.dll"))));
+                RuntimeDependencies.Add(Path.Combine(Path.Combine(LibrariesPath, "PocketSphinx.dll")));
             }
 
             if (Target.Platform == UnrealTargetPlatform.Mac)
@@ -137,14 +194,27 @@ PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libsphinxbase.a"));
                 PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libpocketsphinx.a"));
             }
 
+			if (Target.Platform == UnrealTargetPlatform.Android)
+            {
+                isLibrarySupported = true;
+                string LibraryPath = Path.Combine(ThirdPartyPath, "Android", "ARMv7");
+
+                //PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libpocketsphinx_wrap.a"));
+                //PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "libpocketsphinx.a"));
+            }
+
+			
             if (isLibrarySupported)
             {
                 // Include path
+
+                // TODO: Add back?
                 PublicIncludePaths.Add(Path.Combine(ThirdPartyPath, "PocketSphinx", "Includes"));
+
                 PrivateIncludePaths.Add(Path.Combine(ThirdPartyPath, "PocketSphinx", "Includes"));
             }
 
-            Definitions.Add(string.Format("WITH_POCKET_SPHINX_BINDING={0}", isLibrarySupported ? 1 : 0));
+            //PublicDefinitions.Add(string.Format("WITH_POCKET_SPHINX_BINDING={0}", isLibrarySupported ? 1 : 0));
 
             return isLibrarySupported;
         }

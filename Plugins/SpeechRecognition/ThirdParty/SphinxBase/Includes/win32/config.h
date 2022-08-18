@@ -9,17 +9,11 @@
 /* Enable thread safety */
 #define ENABLE_THREADS 
 
-/* The Thread Local Storage class */
-#define SPHINXBASE_TLS __declspec(thread)
-
-/* Use Q15 fixed-point computation */
-/* #undef FIXED16 */
-
 /* Use fixed-point computation */
 /* #undef FIXED_POINT */
 
 /* Enable matrix algebra with LAPACK */
-#define WITH_LAPACK
+#define WITH_LAPACK 1
 
 /* The size of `long', as computed by sizeof. */
 #define SIZEOF_LONG 4
@@ -32,9 +26,6 @@
 
 /* We have sys/stat.h */
 #define HAVE_SYS_STAT_H 1
-
-/* We do not have unistd.h. */
-#define YY_NO_UNISTD_H 1
 
 /* Extension for executables */
 #define EXEEXT ".exe"

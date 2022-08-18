@@ -5,6 +5,42 @@
 #include "ISpeechRecognition.h"
 #include "SpeechRecognition.generated.h"
 
+// Detected phrases have properties, such as when their start/end time, average volume, and average pitch
+USTRUCT(BlueprintType)
+struct FDetectedPhrase
+{
+	//GENERATED_USTRUCT_BODY()
+
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+		FString phrase;
+
+	UPROPERTY(BlueprintReadWrite)
+		float startTime;
+
+	UPROPERTY(BlueprintReadWrite)
+		float endTime;
+
+	UPROPERTY(BlueprintReadWrite)
+		int avgVolume;
+
+	FDetectedPhrase(FString p, float sT, float eT, int aV) {
+		phrase = p;
+		startTime = sT;
+		endTime = eT;
+		avgVolume = aV;
+	}
+
+	// default constructor
+	FDetectedPhrase() {
+		phrase = FString("");
+		startTime = 0;
+		endTime = 0;
+		avgVolume = 0;
+	}
+};
+
 //Common structures and enumerations
 USTRUCT(BlueprintType)
 struct FRecognisedPhrases
@@ -12,7 +48,7 @@ struct FRecognisedPhrases
 	GENERATED_USTRUCT_BODY()
 
 	UPROPERTY(BlueprintReadWrite)
-	TArray<FString> phrases;
+	TArray<FDetectedPhrase> phrases;
 
 	// default constructor
 	FRecognisedPhrases() {
@@ -23,7 +59,8 @@ UENUM(BlueprintType)
 enum class ESpeechRecognitionMode : uint8
 {
 	VE_KEYWORD 	UMETA(DisplayName = "Keyword Spotting"),
-	VE_GRAMMAR  UMETA(DisplayName = "Grammar")
+	VE_GRAMMAR  UMETA(DisplayName = "Grammar"),
+	VE_LANGUAGE_MODEL UMETA(DisplayName = "Language Model")
 };
 
 UENUM(BlueprintType)
@@ -40,7 +77,9 @@ enum class ESpeechRecognitionLanguage : uint8
 {
 	VE_English 	UMETA(DisplayName = "English"),
 	VE_Chinese  UMETA(DisplayName = "Chinese"),
-	VE_French	UMETA(DisplayName = "French")
+	VE_French	UMETA(DisplayName = "French"),
+	VE_Spanish  UMETA(DisplayName = "Spanish"),
+	VE_Russian  UMETA(DisplayName = "Russian")
 };
 
 UENUM(BlueprintType)
@@ -63,25 +102,25 @@ struct FRecognitionPhrase
 {
 	GENERATED_USTRUCT_BODY()
 
-		UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite)
 		FString phrase;
 
 	UPROPERTY(BlueprintReadWrite)
-		EPhraseRecognitionTolerance tolerance;
+		int tolerance;
 
 	// default constructor
 	FRecognitionPhrase() {
 	}
 
 	// if you wish to only provide a phrase
-	FRecognitionPhrase(FString phrase) {
-		this->phrase = phrase;
-		tolerance = EPhraseRecognitionTolerance::VE_5;
+	FRecognitionPhrase(FString keyword) {
+		this->phrase = keyword;
+		tolerance = 30;
 	}
 
 	// if you wish to specify both a phrase, and a tolerance setting
-	FRecognitionPhrase(FString phrase, EPhraseRecognitionTolerance tolerance) {
-		this->phrase = phrase;
+	FRecognitionPhrase(FString keyword, int tolerance) {
+		this->phrase = keyword;
 		this->tolerance = tolerance;
 	}
 };

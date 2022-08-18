@@ -9,7 +9,7 @@ void FSpeechRecognition::StartupModule()
     if(PLATFORM_WINDOWS) {
         //Search project plugins folder for Dll
         FString dllName = "SphinxBase.dll";
-        if (SearchForDllPath(FPaths::GamePluginsDir(), dllName))
+        if (SearchForDllPath(FPaths::ProjectPluginsDir(), dllName))
         {
         }
         else if (SearchForDllPath(FPaths::EnginePluginsDir(), dllName)) //Failed in project dir, try engine plugins dir
@@ -22,7 +22,7 @@ void FSpeechRecognition::StartupModule()
         }
         
         dllName = "PocketSphinx.dll";
-        if (SearchForDllPath(FPaths::GamePluginsDir(), dllName))
+        if (SearchForDllPath(FPaths::ProjectPluginsDir(), dllName))
         {
         }
         else if (SearchForDllPath(FPaths::EnginePluginsDir(), dllName)) //Failed in project dir, try engine plugins dir

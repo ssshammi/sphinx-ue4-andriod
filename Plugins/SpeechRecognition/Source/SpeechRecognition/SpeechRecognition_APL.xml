@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--ARToolKit plugin additions-->
+<root xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- init section is always evaluated once per architecture -->
+  <init>
+    <log text="Speech Recognition init"/>
+  </init>
+
+  <androidManifestUpdates>
+    <addPermission android:name="android.permission.MANAGE_USERS"/>
+    <addPermission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <addPermission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <addPermission android:name="android.permission.RECORD_AUDIO" />
+	
+	
+  </androidManifestUpdates>
+
+  <!-- optional files or directories to copy to Intermediate/Android/APK -->
+  
+  
+  <resourceCopies>
+    <copyFile src="$S(ProjectDir)/Plugins/SpeechRecognition/Android/libs/pocketsphinx-android-5prealpha-nolib.jar"
+					    dst="$S(BuildDir)/libs/pocketsphinx-android-5prealpha-nolib.jar" />
+    <copyFile src="$S(ProjectDir)/Plugins/SpeechRecognition/Android/jni/armeabi-v7a/libpocketsphinx_jni.so"
+        dst="$S(BuildDir)/libs/libpocketsphinx_jni.so" />
+  </resourceCopies>
+	
+	
+	<AARImports>
+		<insertValue value="$S(ProjectDir)/Plugins/SpeechRecognition/Android/libs/pocketsphinx-android-5prealpha-release.aar" />
+		<insertNewline/>
+	</AARImports>
+	
+	
+  <gameActivityImportAdditions>
+    <insert>
+      import android.widget.Toast;
+      import android.hardware.Camera;
+      import android.hardware.Camera.CameraInfo;
+      import android.hardware.Camera.Parameters;
+      import android.hardware.Camera.PreviewCallback;
+      import android.graphics.SurfaceTexture;
+      import android.graphics.ImageFormat;
+      import android.graphics.PixelFormat;
+      import java.io.BufferedInputStream;
+      import java.io.IOException;
+      import java.io.File;
+      import java.io.FileNotFoundException;
+      import java.io.FileInputStream;
+      import java.io.FileOutputStream;
+      import java.util.Map;
+      import java.util.HashMap;
+      import java.util.HashSet;
+      import java.util.ArrayList;
+      import java.util.zip.ZipInputStream;
+      import java.util.zip.ZipEntry;
+      import java.util.List;
+      import android.util.Log;
+      import com.android.vending.expansion.zipfile.ZipResourceFile;
+      import com.android.vending.expansion.zipfile.ZipResourceFile.ZipEntryRO;
+      import com.android.vending.expansion.zipfile.APKExpansionSupport;
+      import com.sphinxue4.SpeechRecognitionWorker;
+    </insert>
+  </gameActivityImportAdditions>
+
+  <gameActivityClassAdditions>
+    <insert>
+
+
+      private static SpeechRecognitionWorker worker;
+      private static Thread workerThread;
+      private static File obbDir;
+
+      public static void unzip(File zipFile, File targetDirectory) throws IOException {
+      ZipInputStream zis = new ZipInputStream(
+      new BufferedInputStream(new FileInputStream(zipFile)));
+      try {
+
+      ZipEntry ze;
+      int count;
+      byte[] buffer = new byte[8192];
+      while ((ze = zis.getNextEntry()) != null) {
+      File file = new File(targetDirectory, ze.getName());
+
+      Log.debug("Unzip: " + file.getAbsolutePath());
+
+      // only extract if path contains "model"
+      if(!file.getAbsolutePath().contains("model")) {
+      Log.debug("File irrelevant, skipping : " + file.getAbsolutePath());
+      continue;
+      }
+
+      if(file.exists()) {
+      Log.debug("File exists, skipping : " + file.getAbsolutePath());
+      continue;
+      }
+      File dir = ze.isDirectory() ? file : file.getParentFile();
+      if (!dir.isDirectory() &amp;&amp; !dir.mkdirs())
+      throw new FileNotFoundException("Failed to ensure directory: " +
+      dir.getAbsolutePath());
+      if (ze.isDirectory())
+      continue;
+      FileOutputStream fout = new FileOutputStream(file);
+      try {
+      while ((count = zis.read(buffer)) != -1)
+      fout.write(buffer, 0, count);
+      } finally {
+      fout.close();
+      }
+      }
+      } finally {
+      zis.close();
+      }
+      }
+
+      private void extractOBB() {
+      try{
+      String expansionFilePath = "/storage/emulated/0/obb/"+getApplicationContext().getPackageName()+"/main.1."+ getApplicationContext().getPackageName() + ".obb";
+      Log.debug("ExtractOBB: " +expansionFilePath);
+      ZipResourceFile apkExpansionFile = new ZipResourceFile(expansionFilePath);
+      if(apkExpansionFile != null)
+      {
+      ZipEntryRO[] entries = apkExpansionFile.getAllEntries();
+      Log.debug("Expansion File Counter: " + entries.length);
+      HashSet&lt;File&gt; extractFiles = new HashSet&lt;File&gt;();
+      for(ZipEntryRO entry : entries) {
+      File f = entry.getZipFile();
+      extractFiles.add(f);
+      }
+
+      for(File zipFile : extractFiles) {
+      String path = getApplicationContext().getFilesDir().getAbsolutePath();
+      File dest = getApplicationContext().getFilesDir();
+      unzip(zipFile, dest);
+      }
+      }
+
+      }catch(Exception e) {
+      Log.debug("Exception: " + e.getMessage());
+      }
+      }
+
+      // create the speech recognition worker
+      public void AndroidThunkJava_CreateSpeechRecognition() {
+      try {
+      Log.debug("Start AndroidThunkJava_CreateSpeechRecognition");
+      worker = new SpeechRecognitionWorker();
+      worker.init();
+      workerThread = new Thread(worker);
+      workerThread.setDaemon(true);
+      workerThread.start();
+      workerThread.join();
+      Log.debug("End AndroidThunkJava_CreateSpeechRecognition");
+      }catch (Exception e) {
+	  Log.debug("AndroidThunkJava_CreateSpeechRecognition failed with exception " + e.getMessage());
+      }
+      }
+
+      // Destroy the speech recognition worker
+      public void AndroidThunkJava_ShutdownSpeechRecognition() {
+      try {
+      Log.debug("Start AndroidThunkJava_ShutdownSpeechRecognition");
+      worker.stopListening();
+      Log.debug("End AndroidThunkJava_ShutdownSpeechRecognition");
+      }catch (Exception e) {
+      Log.debug("AndroidThunkJava_ShutdownSpeechRecognition failed with exception " + e.getMessage());
+      }
+      }
+
+      //  init the speech recognition worker
+      public void AndroidThunkJava_SetKeywordPhrases(final String[] phrases, final String[] tollerence, final int keyCount) {
+      Thread thread = new Thread() {
+      public void run() {
+      try {
+      Log.debug("Start AndroidThunkJava_SetKeywordPhrases");
+      Log.debug("Stop Listening");
+      worker.stopListening();
+      Log.debug("Stopped Listening");
+      worker.init();
+      worker.setKeywordPhrases(phrases, tollerence, keyCount);
+      workerThread = new Thread(worker);
+      workerThread.setDaemon(true);
+      workerThread.start();
+      Log.debug("End AndroidThunkJava_SetKeywordPhrases");
+      }catch (Exception e) {
+      Log.debug("AndroidThunkJava_SetKeywordPhrases failed with exception " + e.getMessage());
+      }
+      }
+      };
+      thread.start();
+      }
+
+      public void AndroidThunkJava_SetGrammarMode(final String grammarName) {
+      Thread thread = new Thread() {
+      public void run() {
+      try {
+      Log.debug("Start AndroidThunkJava_SetGrammarMode");
+      Log.debug("Stop Listening");
+      worker.stopListening();
+      Log.debug("Stopped Listening");
+      worker.init();
+      worker.setGrammarMode(grammarName);
+      workerThread = new Thread(worker);
+      workerThread.setDaemon(true);
+      workerThread.start();
+      Log.debug("End AndroidThunkJava_SetGrammarMode");
+      }catch (Exception e) {
+      Log.debug("AndroidThunkJava_SetGrammarMode failed with exception " + e.getMessage());
+      }
+      }
+      };
+      thread.start();
+      }
+
+      public void AndroidThunkJava_SetLanguageModel(final String langName) {
+      Thread thread = new Thread() {
+      public void run() {
+      try {
+      Log.debug("Start AndroidThunkJava_SetLanguageModel");
+      Log.debug("Stop Listening");
+      worker.stopListening();
+      Log.debug("Stopped Listening");
+      worker.init();
+      worker.setLanguageModel(langName);
+      workerThread = new Thread(worker);
+      workerThread.setDaemon(true);
+      workerThread.start();
+      Log.debug("End AndroidThunkJava_SetLanguageModel");
+      }catch (Exception e) {
+      Log.debug("AndroidThunkJava_SetLanguageModel failed with exception " + e.getMessage());
+      }
+      }
+      };
+      thread.start();
+      }
+
+
+      // logs text - test
+      public boolean AndroidThunkJava_LogTxt(String txt) {
+      try {
+      Log.debug("Start AndroidThunkJava_LogTxt");
+      worker.LogTxt(txt);
+      Log.debug("End AndroidThunkJava_LogTxt");
+      return true;
+      }catch (Exception e) {
+      Log.debug("AndroidThunkJava_LogTxt failed with exception " + e.getMessage());
+      return false;
+      }
+      }
+
+
+    </insert>
+  </gameActivityClassAdditions>
+
+  <!-- optional additions to GameActivity onCreate in GameActivity.java -->
+  <gameActivityOnCreateAdditions>
+    <insert>
+      extractOBB();
+    </insert>
+  </gameActivityOnCreateAdditions>
+
+
+</root>

@@ -1,0 +1,46 @@
+Notes:
+
+Only use Keyword recognition mode, the grammar mode for mobile appears somewhat broken.
+It appears phrases which violate the grammar rules, still get recognised if they partially match.
+Eg. For the following grammar, saying just “two” or “nine”, will return as a match, despite it not being of the form <digit> <operation> <digit>
+grammar check;
+
+public <final_rule> = <digit> <operation> <digit>;
+
+<operation> = ( add | subtract | divide | multiply);
+
+<digit> = ( one | two | three | four | five | six | seven | eight | nine | zero );
+
+Currently, only packaging/installing a project allows speech detection to work.
+Launching a project directly will cause the project to crash.
+This is because the speech recognition models are copied and extracted from the .obb, which does not happen when the project is launched directly.
+I do think it would be possible to manually copy the speech recognition models to an external location, and update the references to point to them each time, but I have yet to try this myself.
+Changes:
+
+OnWordsSpoken now returns a collection of FDetectedPhrase’s (in the order of which they are recognised).
+This allows a single call to contain all phrases that were detected in an utterance.
+This enables logic to implement multiple phrases/commands at once (previously OnWordsSpoken would have been called twice).
+The FDetectedPhrase contains more than just the phrase. Start/End time of the detected phrase, so the length of a phrase can be calculated, and used.
+There is also an avgVolume property, but for now, I am not setting it. Future version hopefully.
+Tolerance is now an Integer (rather than a enum setting). This makes more sense, and allows more flexibility.
+Start with 30, and work up/down in increments of 5 or 10, to find the best balance between no detection and misfires.
+How to test the demo project:
+
+Extract the archive project to unreal engine project path.
+Open the project file, and hit File=>Package Project=>Android=>Android Multi (unless you know your intended architecture)
+Deploy onto your device, and run.
+The default map is a set of cubes. When the player colides with a cube, a test map is loaded.
+I would suggest running the game map, since it’s an example how actions can be controlled by the recognised phrases.
+The other maps are examples of how the plugin can be used by only C++, or as a test of alternative implementations (alternative languages, grammar/language modes).
+How to implement within your project:
+
+Ensure you can build/run your project successfully on your android device.
+From the demo project, copy the following folders to your project
+Plugins => Plugins
+Content\SpeechRecognition => Content\SpeechRecognition
+Build\Android\jni => Build\Android\jni
+Build\Android\libs => Build\Android\libs
+Build\Android\src\com\sphinxue4 => Build\Android\src\com\sphinxue4
+
+Implement speech recognition (as per the actors from the demo project).
+Regenerate the project/visual studio solution, and then package/deploy for android. (as done for the demo project).

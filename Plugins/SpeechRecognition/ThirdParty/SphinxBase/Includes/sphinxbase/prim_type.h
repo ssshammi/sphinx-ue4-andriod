@@ -85,7 +85,7 @@ extern "C" {
 } /* Fool Emacs into not indenting things. */
 #endif
 
-#include <win32/sphinx_config.h>
+#include <sphinx_config.h>
 
 /* Define some things for VisualDSP++ */
 #if defined(__ADSPBLACKFIN__) && !defined(__GNUC__)
@@ -129,8 +129,7 @@ typedef unsigned __int64 uint64;
 typedef long long	   int64;
 typedef unsigned long long uint64;
 #else /* !HAVE_LONG_LONG && SIZEOF_LONG_LONG == 8 */
-typedef long long       int64;
-typedef unsigned long long       uint64;
+
 #endif /* !HAVE_LONG_LONG && SIZEOF_LONG_LONG == 8 */
 
 #ifndef TRUE
