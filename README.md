@@ -11,3 +11,5 @@ I am basically having some issues with Andriod build, I fixed most bugs and got 
 
 if anyone is able to resolve it please let me know 
 ssshammi@gmail.com
+
+I basically cleaned the code to make it work with unreal 4.27.2 and added the supported and missing files for andriod. but When i package it, it will not work, And i tried several things, But it seems that the java code is not getting initiated or it's the build settings. Also i had issues which OBB file not getting generated when changed to arm64. However when i migrated the map it would let me build for arm64.  SO I want someone to help me debug the issues why only on android this plugin is not working. 
